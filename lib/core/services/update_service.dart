@@ -41,8 +41,8 @@ class UpdateService {
   UpdateService._();
 
   // ⚠️ CHANGE THESE TO YOUR GITHUB REPO ⚠️
-  static const String owner = 'YOUR_GITHUB_USERNAME';
-  static const String repo = 'YOUR_REPO_NAME';
+  static const String owner = 'alyawiguna310-blip';
+  static const String repo = 'Ai-Companion';
 
   /// Returns an [UpdateInfo] if a newer release exists,
   /// or `null` if up to date / repo not configured / network error.
