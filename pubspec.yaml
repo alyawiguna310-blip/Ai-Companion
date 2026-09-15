@@ -1,0 +1,98 @@
+name: ai_companion
+description: "AI Companion v2.0 - Made by Ayvan"
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # =========================
+  # Excel / Charts / Calendar
+  # =========================
+  excel: ^4.0.6
+  fl_chart: ^0.69.0
+  table_calendar: ^3.1.2
+  path_provider: ^2.1.4
+  share_plus: ^10.0.0
+
+  # =========================
+  # Url Github Updater
+  # =========================
+  url_launcher: ^6.3.0
+  package_info_plus: ^8.0.2
+  
+  # =========================
+  # Core
+  # =========================
+  http: ^1.5.0
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.2.0
+  intl: ^0.20.3
+
+  # =========================
+  # UI
+  # =========================
+  flutter_animate: ^4.5.2
+  animations: ^2.0.11
+
+  # =========================
+  # State Management
+  # =========================
+  flutter_riverpod: ^2.6.1
+
+  # =========================
+  # Navigation
+  # =========================
+  go_router: ^16.0.0
+
+  # =========================
+  # Storage
+  # =========================
+  shared_preferences: ^2.5.3
+
+  # =========================
+  # Markdown & Code
+  # =========================
+  flutter_markdown: ^0.7.7+1
+
+  # =========================
+  # Utilities
+  # =========================
+  uuid: ^4.5.1
+
+  # =========================
+  # Voice
+  # =========================
+  speech_to_text: ^7.3.0
+  flutter_tts: ^4.2.3
+
+  # =========================
+  # Vision
+  # =========================
+  image_picker: ^1.2.0
+  camera: ^0.11.2+1
+
+  # =========================
+  # Permissions
+  # =========================
+  permission_handler: ^12.0.1
+
+  # =========================
+  # Notifications
+  # =========================
+  flutter_local_notifications: ^19.4.1
+  timezone: ^0.10.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
