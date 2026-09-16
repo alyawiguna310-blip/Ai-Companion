@@ -1,19 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/services/wallet_export_service.dart';
 import '../../core/services/wallet_storage_service.dart';
+import 'saving_goals_page.dart';
+import 'trend_forecast_page.dart';
+import 'wallet_accounts_page.dart';
 import 'wallet_stats_page.dart';
 
-/// The Wallet "More" hub — a premium, grouped grid of tools.
-///
-/// Design language:
-///   • Large hero header with live balance + net flow
-///   • Grouped sections (Insights / Manage / System)
-///   • Each tile has its own color identity and soft gradient
-///   • Staggered entrance animations
-///   • Tactile press feedback (scale + ink)
 class WalletMorePage extends StatefulWidget {
   const WalletMorePage({super.key});
 
@@ -27,6 +23,7 @@ class _WalletMorePageState extends State<WalletMorePage> {
   int _expense = 0;
   int _txCount = 0;
   bool _isLoading = true;
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -57,9 +54,6 @@ class _WalletMorePageState extends State<WalletMorePage> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ================================================
-            // PREMIUM APP BAR
-            // ================================================
             SliverAppBar(
               pinned: false,
               floating: true,
@@ -108,10 +102,6 @@ class _WalletMorePageState extends State<WalletMorePage> {
                 ],
               ),
             ),
-
-            // ================================================
-            // HERO BALANCE CARD
-            // ================================================
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
@@ -124,15 +114,10 @@ class _WalletMorePageState extends State<WalletMorePage> {
                 ),
               ),
             ),
-
-            // ================================================
-            // SECTION — INSIGHTS
-            // ================================================
             const _SectionHeader(
               title: 'Insights',
               subtitle: 'Understand your money',
             ).toSliver(),
-
             _buildGridSection(
               context,
               tiles: [
@@ -140,18 +125,18 @@ class _WalletMorePageState extends State<WalletMorePage> {
                   icon: Icons.insights_rounded,
                   label: 'Statistics',
                   accent: const Color(0xFF6C5CE7),
-                  onTap: () => _open(
-                    context,
-                    const WalletStatsPage(),
-                  ),
+                  onTap: () =>
+                      _open(context, const WalletStatsPage()),
                 ),
                 _TileData(
                   icon: Icons.show_chart_rounded,
                   label: 'Trend Forecast',
                   accent: const Color(0xFF00B894),
                   badge: 'BETA',
-                  onTap: () =>
-                      _comingSoon(context, 'Trend Forecast'),
+                  onTap: () => _open(
+                    context,
+                    const TrendForecastPage(),
+                  ),
                 ),
                 _TileData(
                   icon: Icons.pie_chart_rounded,
@@ -161,55 +146,56 @@ class _WalletMorePageState extends State<WalletMorePage> {
                       _comingSoon(context, 'Budget Management'),
                 ),
               ],
-              startDelay: 100,
+              startDelay: 80,
             ),
-
-            // ================================================
-            // SECTION — MANAGE
-            // ================================================
             const _SectionHeader(
               title: 'Manage',
               subtitle: 'Organize and control',
             ).toSliver(),
-
             _buildGridSection(
               context,
               tiles: [
                 _TileData(
+                  icon: Icons.account_balance_rounded,
+                  label: 'Accounts',
+                  accent: const Color(0xFFD63031),
+                  onTap: () => _open(
+                    context,
+                    const WalletAccountsPage(),
+                  ),
+                ),
+                _TileData(
+                  icon: Icons.savings_rounded,
+                  label: 'Saving Goals',
+                  accent: const Color(0xFFFDCB6E),
+                  onTap: () => _open(
+                    context,
+                    const SavingGoalsPage(),
+                  ),
+                ),
+                _TileData(
                   icon: Icons.search_rounded,
                   label: 'Search',
                   accent: const Color(0xFF0984E3),
-                  onTap: () =>
-                      _comingSoon(context, 'Search Transactions'),
-                ),
-                _TileData(
-                  icon: Icons.category_rounded,
-                  label: 'Categories',
-                  accent: const Color(0xFFD63031),
                   onTap: () => _comingSoon(
                     context,
-                    'Category Management',
+                    'Search Transactions',
                   ),
                 ),
                 _TileData(
                   icon: Icons.repeat_rounded,
                   label: 'Recurring',
                   accent: const Color(0xFF00CEC9),
-                  onTap: () =>
-                      _comingSoon(context, 'Recurring'),
+                  onTap: () => _comingSoon(context, 'Recurring'),
                 ),
                 _TileData(
-                  icon: Icons.savings_rounded,
-                  label: 'Saving Goals',
-                  accent: const Color(0xFFFDCB6E),
-                  onTap: () =>
-                      _comingSoon(context, 'Saving Goals'),
-                ),
-                _TileData(
-                  icon: Icons.file_download_rounded,
-                  label: 'Export Excel',
-                  accent: const Color(0xFF27AE60),
-                  onTap: () => _export(context),
+                  icon: Icons.category_rounded,
+                  label: 'Categories',
+                  accent: const Color(0xFF9B59B6),
+                  onTap: () => _comingSoon(
+                    context,
+                    'Category Management',
+                  ),
                 ),
                 _TileData(
                   icon: Icons.backup_rounded,
@@ -219,12 +205,36 @@ class _WalletMorePageState extends State<WalletMorePage> {
                       _comingSoon(context, 'Backup & Restore'),
                 ),
               ],
-              startDelay: 300,
+              startDelay: 260,
             ),
-
-            // ================================================
-            // FOOTER
-            // ================================================
+            const _SectionHeader(
+              title: 'Export',
+              subtitle: 'Save your data',
+            ).toSliver(),
+            _buildGridSection(
+              context,
+              tiles: [
+                _TileData(
+                  icon: Icons.share_rounded,
+                  label: 'Share Excel',
+                  accent: const Color(0xFF27AE60),
+                  onTap: () => _exportShare(context),
+                ),
+                _TileData(
+                  icon: Icons.phone_android_rounded,
+                  label: 'Save to Device',
+                  accent: const Color(0xFF3498DB),
+                  onTap: () => _exportSaveToDevice(context),
+                ),
+                _TileData(
+                  icon: Icons.cloud_upload_rounded,
+                  label: 'Save to Drive',
+                  accent: const Color(0xFF4285F4),
+                  onTap: () => _exportSaveToDrive(context),
+                ),
+              ],
+              startDelay: 440,
+            ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 32, 20, 40),
@@ -281,7 +291,7 @@ class _WalletMorePageState extends State<WalletMorePage> {
           (context, index) {
             return _PremiumTile(
               data: tiles[index],
-              delay: startDelay + (index * 60),
+              delay: startDelay + (index * 70),
             );
           },
           childCount: tiles.length,
@@ -291,7 +301,7 @@ class _WalletMorePageState extends State<WalletMorePage> {
   }
 
   // ============================================================
-  // ACTIONS
+  // NAVIGATION
   // ============================================================
 
   void _open(BuildContext context, Widget page) {
@@ -301,15 +311,21 @@ class _WalletMorePageState extends State<WalletMorePage> {
     );
   }
 
-  Future<void> _export(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
+  // ============================================================
+  // EXPORT — SHARE SHEET (share anywhere: WhatsApp, email, Drive...)
+  // ============================================================
 
+  Future<void> _exportShare(BuildContext context) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await WalletExportService.exportAndShare();
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'Excel file ready. Choose where to save it.',
+            'Excel file ready. Pick where to send it.',
             style: GoogleFonts.poppins(fontSize: 13),
           ),
           behavior: SnackBarBehavior.floating,
@@ -331,8 +347,104 @@ class _WalletMorePageState extends State<WalletMorePage> {
           ),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
     }
   }
+
+  // ============================================================
+  // EXPORT — SAVE TO DEVICE (Android SAF picker)
+  // ============================================================
+
+  Future<void> _exportSaveToDevice(BuildContext context) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final path = await WalletExportService.exportAndSaveToDevice();
+      if (path == null) {
+        // User cancelled.
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Saved: $path',
+            style: GoogleFonts.poppins(fontSize: 12),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Save failed: $error',
+            style: GoogleFonts.poppins(fontSize: 13),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  // ============================================================
+  // EXPORT — SAVE TO DRIVE (share sheet targeted at cloud apps)
+  // ============================================================
+
+  Future<void> _exportSaveToDrive(BuildContext context) async {
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await WalletExportService.exportAndShare(
+        shareSubject: 'Aicompanion Wallet Export — Drive backup',
+        shareText:
+            'Save this Excel file to Google Drive from the share sheet.',
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Pick Google Drive in the share sheet to save.',
+            style: GoogleFonts.poppins(fontSize: 13),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Save failed: $error',
+            style: GoogleFonts.poppins(fontSize: 13),
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  // ============================================================
+  // COMING SOON
+  // ============================================================
 
   void _comingSoon(BuildContext context, String name) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -354,7 +466,7 @@ class _WalletMorePageState extends State<WalletMorePage> {
 // HERO BALANCE CARD
 // ============================================================
 
-class _HeroBalanceCard extends StatelessWidget {
+class _HeroBalanceCard extends StatefulWidget {
   final int balance;
   final int income;
   final int expense;
@@ -370,185 +482,227 @@ class _HeroBalanceCard extends StatelessWidget {
   });
 
   @override
+  State<_HeroBalanceCard> createState() => _HeroBalanceCardState();
+}
+
+class _HeroBalanceCardState extends State<_HeroBalanceCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fade = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primary,
-            const Color(0xFF8E5CF7),
-            colorScheme.primary.withValues(alpha: 0.85),
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colorScheme.primary,
+                const Color(0xFF8E5CF7),
+                colorScheme.primary.withValues(alpha: 0.85),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color:
+                    colorScheme.primary.withValues(alpha: 0.35),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color:
+                    colorScheme.primary.withValues(alpha: 0.15),
+                blurRadius: 60,
+                offset: const Offset(0, 20),
+              ),
+            ],
           ),
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.15),
-            blurRadius: 60,
-            offset: const Offset(0, 20),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF00E676),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'LIVE',
+                          style: GoogleFonts.poppins(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.auto_awesome,
+                    size: 16,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Current Balance',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.8),
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (widget.isLoading)
+                Container(
+                  height: 40,
+                  width: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                )
+              else
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _formatRupiah(widget.balance),
+                    style: GoogleFonts.poppins(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                      height: 1.05,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+                  horizontal: 14,
+                  vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF00E676),
-                        shape: BoxShape.circle,
+                    Expanded(
+                      child: _MiniStat(
+                        label: 'Income',
+                        value: _formatShort(widget.income),
+                        icon: Icons.arrow_downward_rounded,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'LIVE',
-                      style: GoogleFonts.poppins(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 1.0,
+                    Container(
+                      width: 1,
+                      height: 32,
+                      color:
+                          Colors.white.withValues(alpha: 0.15),
+                    ),
+                    Expanded(
+                      child: _MiniStat(
+                        label: 'Expense',
+                        value: _formatShort(widget.expense),
+                        icon: Icons.arrow_upward_rounded,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 32,
+                      color:
+                          Colors.white.withValues(alpha: 0.15),
+                    ),
+                    Expanded(
+                      child: _MiniStat(
+                        label: 'Records',
+                        value: '${widget.txCount}',
+                        icon: Icons.receipt_long_rounded,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Spacer(),
-              Icon(
-                Icons.auto_awesome,
-                size: 16,
-                color: Colors.white.withValues(alpha: 0.7),
-              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Current Balance',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Colors.white.withValues(alpha: 0.8),
-              letterSpacing: 0.3,
-            ),
-          ),
-          const SizedBox(height: 6),
-          if (isLoading)
-            Container(
-              height: 40,
-              width: 200,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            )
-          else
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _formatRupiah(balance),
-                style: GoogleFonts.poppins(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                  height: 1.05,
-                ),
-              ),
-            ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 12,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _MiniStat(
-                    label: 'Income',
-                    value: _formatShort(income),
-                    icon: Icons.arrow_downward_rounded,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 32,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
-                Expanded(
-                  child: _MiniStat(
-                    label: 'Expense',
-                    value: _formatShort(expense),
-                    icon: Icons.arrow_upward_rounded,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 32,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
-                Expanded(
-                  child: _MiniStat(
-                    label: 'Records',
-                    value: '$txCount',
-                    icon: Icons.receipt_long_rounded,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
-    ).animate().fadeIn(duration: 400.ms).slideY(
-          begin: 0.08,
-          end: 0,
-          duration: 500.ms,
-          curve: Curves.easeOutCubic,
-        );
+    );
   }
 
   static String _formatRupiah(int amount) {
     final isNegative = amount < 0;
     final digits = amount.abs().toString();
     final buffer = StringBuffer();
-
     for (var i = 0; i < digits.length; i++) {
       if (i > 0 && (digits.length - i) % 3 == 0) {
         buffer.write('.');
       }
       buffer.write(digits[i]);
     }
-
     return '${isNegative ? '-' : ''}Rp $buffer';
   }
 
@@ -654,13 +808,11 @@ class _SectionHeader extends StatelessWidget {
     );
   }
 
-  Widget toSliver() {
-    return SliverToBoxAdapter(child: this);
-  }
+  Widget toSliver() => SliverToBoxAdapter(child: this);
 }
 
 // ============================================================
-// PREMIUM TILE
+// TILE DATA
 // ============================================================
 
 class _TileData {
@@ -679,6 +831,10 @@ class _TileData {
   });
 }
 
+// ============================================================
+// PREMIUM TILE — GUARANTEED TO ANIMATE
+// ============================================================
+
 class _PremiumTile extends StatefulWidget {
   final _TileData data;
   final int delay;
@@ -692,8 +848,71 @@ class _PremiumTile extends StatefulWidget {
   State<_PremiumTile> createState() => _PremiumTileState();
 }
 
-class _PremiumTileState extends State<_PremiumTile> {
+class _PremiumTileState extends State<_PremiumTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+  late final Animation<double> _scale;
+  Timer? _startTimer;
   bool _pressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+
+    _fade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(
+        0.0,
+        0.7,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.15),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(
+          0.1,
+          1.0,
+          curve: Curves.easeOutCubic,
+        ),
+      ),
+    );
+
+    _scale = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(
+          0.15,
+          1.0,
+          curve: Curves.easeOutBack,
+        ),
+      ),
+    );
+
+    _startTimer = Timer(
+      Duration(milliseconds: widget.delay),
+      () {
+        if (mounted) _controller.forward();
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _startTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -703,163 +922,174 @@ class _PremiumTileState extends State<_PremiumTile> {
     final isDark = theme.brightness == Brightness.dark;
 
     return RepaintBoundary(
-      child: AnimatedScale(
-        scale: _pressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: GestureDetector(
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTapCancel: () => setState(() => _pressed = false),
-          onTap: data.onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1C1C1E)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: data.accent.withValues(alpha: 0.14),
-                width: 1.2,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _fade.value,
+            child: FractionalTranslation(
+              translation: _slide.value,
+              child: Transform.scale(
+                scale: _scale.value,
+                child: child,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: data.accent.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-                if (!isDark)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-              ],
             ),
-            child: Stack(
-              children: [
-                // Subtle gradient wash top-right.
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        colors: [
-                          data.accent.withValues(alpha: 0.15),
-                          data.accent.withValues(alpha: 0.0),
-                        ],
-                      ),
+          );
+        },
+        child: AnimatedScale(
+          scale: _pressed ? 0.94 : 1.0,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: GestureDetector(
+            onTapDown: (_) => setState(() => _pressed = true),
+            onTapUp: (_) => setState(() => _pressed = false),
+            onTapCancel: () =>
+                setState(() => _pressed = false),
+            onTap: data.onTap,
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1C1C1E)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: data.accent.withValues(alpha: 0.14),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        data.accent.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                  if (!isDark)
+                    BoxShadow(
+                      color:
+                          Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              data.accent.withValues(alpha: 0.22),
-                              data.accent.withValues(alpha: 0.10),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: data.accent
-                                .withValues(alpha: 0.20),
-                            width: 1,
-                          ),
-                        ),
-                        child: Icon(
-                          data.icon,
-                          size: 24,
-                          color: data.accent,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Flexible(
-                        child: Text(
-                          data.label,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            height: 1.15,
-                            letterSpacing: -0.1,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (data.badge != null)
+                ],
+              ),
+              child: Stack(
+                children: [
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: 0,
+                    right: 0,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: RadialGradient(
                           colors: [
-                            data.accent,
-                            data.accent.withValues(alpha: 0.7),
+                            data.accent
+                                .withValues(alpha: 0.15),
+                            data.accent
+                                .withValues(alpha: 0.0),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: data.accent
-                                .withValues(alpha: 0.4),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        data.badge!,
-                        style: GoogleFonts.poppins(
-                          fontSize: 7,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: 0.7,
-                        ),
                       ),
                     ),
                   ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisAlignment:
+                          MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                data.accent
+                                    .withValues(alpha: 0.22),
+                                data.accent
+                                    .withValues(alpha: 0.10),
+                              ],
+                            ),
+                            borderRadius:
+                                BorderRadius.circular(16),
+                            border: Border.all(
+                              color: data.accent
+                                  .withValues(alpha: 0.20),
+                              width: 1,
+                            ),
+                          ),
+                          child: Icon(
+                            data.icon,
+                            size: 24,
+                            color: data.accent,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Flexible(
+                          child: Text(
+                            data.label,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              height: 1.15,
+                              letterSpacing: -0.1,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (data.badge != null)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              data.accent,
+                              data.accent
+                                  .withValues(alpha: 0.7),
+                            ],
+                          ),
+                          borderRadius:
+                              BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: data.accent
+                                  .withValues(alpha: 0.4),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          data.badge!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.7,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    )
-        .animate(delay: Duration(milliseconds: widget.delay))
-        .fadeIn(duration: 320.ms, curve: Curves.easeOut)
-        .slideY(
-          begin: 0.15,
-          end: 0,
-          duration: 380.ms,
-          curve: Curves.easeOutCubic,
-        )
-        .scale(
-          begin: const Offset(0.92, 0.92),
-          end: const Offset(1, 1),
-          duration: 400.ms,
-          curve: Curves.easeOutBack,
-        );
+    );
   }
 }

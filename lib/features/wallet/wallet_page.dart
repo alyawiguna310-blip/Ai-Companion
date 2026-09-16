@@ -3,10 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/services/wallet_account_storage_service.dart';
 import '../../core/services/wallet_export_service.dart';
 import '../../core/services/wallet_storage_service.dart';
+import '../../models/wallet_account.dart';
 import '../../models/wallet_transaction.dart';
 import 'add_transaction_sheet.dart';
+import 'wallet_accounts_page.dart';
 import 'wallet_more_page.dart';
 import 'wallet_stats_page.dart';
 
@@ -19,6 +22,9 @@ class WalletPage extends StatefulWidget {
 
 class _WalletPageState extends State<WalletPage> {
   List<WalletTransaction> _transactions = [];
+  List<WalletAccount> _accounts = [];
+  String _activeAccountId =
+      WalletAccountStorageService.defaultPersonalId;
   bool _isLoading = true;
 
   @override
@@ -28,14 +34,46 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Future<void> _load() async {
-    final loaded =
-        await WalletStorageService.loadTransactions();
+    final accounts = await WalletAccountStorageService.load();
+    final loaded = await WalletStorageService.loadTransactions();
+
     if (!mounted) return;
+
+    // Make sure active account still exists.
+    var activeId = _activeAccountId;
+    if (accounts.isNotEmpty &&
+        !accounts.any((a) => a.id == activeId)) {
+      activeId = accounts.first.id;
+    }
+
     setState(() {
+      _accounts = accounts;
+      _activeAccountId = activeId;
       _transactions = loaded;
       _isLoading = false;
     });
   }
+
+  // ============================================================
+  // GETTERS
+  // ============================================================
+
+  List<WalletTransaction> get _visibleTransactions =>
+      _transactions
+          .where((tx) => tx.accountId == _activeAccountId)
+          .toList();
+
+  WalletAccount? get _activeAccount {
+    if (_accounts.isEmpty) return null;
+    for (final a in _accounts) {
+      if (a.id == _activeAccountId) return a;
+    }
+    return _accounts.first;
+  }
+
+  // ============================================================
+  // TRANSACTIONS
+  // ============================================================
 
   Future<void> _openAddSheet() async {
     final result = await showModalBottomSheet<WalletTransaction>(
@@ -48,8 +86,10 @@ class _WalletPageState extends State<WalletPage> {
 
     if (result == null || !mounted) return;
 
+    final stamped = result.copyWith(accountId: _activeAccountId);
     final updated =
-        await WalletStorageService.addTransaction(result);
+        await WalletStorageService.addTransaction(stamped);
+
     if (!mounted) return;
     setState(() {
       _transactions = updated;
@@ -60,8 +100,7 @@ class _WalletPageState extends State<WalletPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        final colorScheme =
-            Theme.of(dialogContext).colorScheme;
+        final colorScheme = Theme.of(dialogContext).colorScheme;
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
@@ -107,6 +146,10 @@ class _WalletPageState extends State<WalletPage> {
     });
   }
 
+  // ============================================================
+  // NAVIGATION
+  // ============================================================
+
   void _openStats() {
     Navigator.push(
       context,
@@ -125,8 +168,19 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
+  Future<void> _openAccounts() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const WalletAccountsPage(),
+      ),
+    );
+    _load();
+  }
+
   Future<void> _handleExport() async {
-    if (_transactions.isEmpty) {
+    final visible = _visibleTransactions;
+    if (visible.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No transactions to export yet.'),
@@ -156,6 +210,10 @@ class _WalletPageState extends State<WalletPage> {
       );
     }
   }
+
+  // ============================================================
+  // FORMATTING
+  // ============================================================
 
   String _formatRupiah(int amount) {
     final isNegative = amount < 0;
@@ -326,8 +384,10 @@ class _WalletPageState extends State<WalletPage> {
                   ),
                   children: [
                     _buildHeroCard(theme),
+                    const SizedBox(height: 14),
+                    _buildAccountChips(theme),
                     const SizedBox(height: 20),
-                    if (_transactions.isEmpty)
+                    if (_visibleTransactions.isEmpty)
                       _buildEmptyState(theme)
                     else ...[
                       Row(
@@ -342,8 +402,8 @@ class _WalletPageState extends State<WalletPage> {
                           ),
                           const Spacer(),
                           Text(
-                            '${_transactions.length} record'
-                            '${_transactions.length == 1 ? '' : 's'}',
+                            '${_visibleTransactions.length} record'
+                            '${_visibleTransactions.length == 1 ? '' : 's'}',
                             style: GoogleFonts.poppins(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
@@ -376,17 +436,17 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   // ============================================================
-  // HERO BALANCE CARD
+  // HERO CARD
   // ============================================================
 
   Widget _buildHeroCard(ThemeData theme) {
     final colorScheme = theme.colorScheme;
+    final visible = _visibleTransactions;
     final balance =
-        WalletStorageService.calculateBalance(_transactions);
-    final income =
-        WalletStorageService.totalIncome(_transactions);
-    final expense =
-        WalletStorageService.totalExpense(_transactions);
+        WalletStorageService.calculateBalance(visible);
+    final income = WalletStorageService.totalIncome(visible);
+    final expense = WalletStorageService.totalExpense(visible);
+    final account = _activeAccount;
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -396,22 +456,19 @@ class _WalletPageState extends State<WalletPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            colorScheme.primary,
+            account?.color ?? colorScheme.primary,
             const Color(0xFF8E5CF7),
-            colorScheme.primary.withValues(alpha: 0.85),
+            (account?.color ?? colorScheme.primary)
+                .withValues(alpha: 0.85),
           ],
           stops: const [0.0, 0.5, 1.0],
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.35),
+            color: (account?.color ?? colorScheme.primary)
+                .withValues(alpha: 0.35),
             blurRadius: 24,
             offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.15),
-            blurRadius: 60,
-            offset: const Offset(0, 20),
           ),
         ],
       ),
@@ -442,7 +499,7 @@ class _WalletPageState extends State<WalletPage> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'LIVE',
+                      (account?.name ?? 'Personal').toUpperCase(),
                       style: GoogleFonts.poppins(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
@@ -503,7 +560,6 @@ class _WalletPageState extends State<WalletPage> {
                     label: 'Income',
                     value: _formatRupiah(income),
                     icon: Icons.arrow_downward_rounded,
-                    isPositive: true,
                   ),
                 ),
                 Container(
@@ -516,7 +572,6 @@ class _WalletPageState extends State<WalletPage> {
                     label: 'Expense',
                     value: _formatRupiah(expense),
                     icon: Icons.arrow_upward_rounded,
-                    isPositive: false,
                   ),
                 ),
               ],
@@ -533,11 +588,71 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   // ============================================================
+  // ACCOUNT CHIPS
+  // ============================================================
+
+  Widget _buildAccountChips(ThemeData theme) {
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _accounts.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          if (index == _accounts.length) {
+            return ActionChip(
+              avatar: Icon(
+                Icons.settings_rounded,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              label: Text(
+                'Manage',
+                style: GoogleFonts.poppins(fontSize: 12),
+              ),
+              onPressed: _openAccounts,
+            );
+          }
+
+          final account = _accounts[index];
+          final selected = account.id == _activeAccountId;
+
+          return ChoiceChip(
+            avatar: Icon(
+              account.icon,
+              size: 16,
+              color: selected ? Colors.white : account.color,
+            ),
+            label: Text(
+              account.name,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? Colors.white
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+            selected: selected,
+            selectedColor: account.color,
+            backgroundColor:
+                theme.colorScheme.surfaceContainerHighest,
+            showCheckmark: false,
+            onSelected: (_) {
+              setState(() => _activeAccountId = account.id);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // ============================================================
   // TRANSACTION LIST
   // ============================================================
 
   List<Widget> _buildTransactionList(ThemeData theme) {
-    final displayOrder = _transactions.reversed.toList();
+    final displayOrder = _visibleTransactions.reversed.toList();
 
     return displayOrder.asMap().entries.map(
       (entry) {
@@ -552,7 +667,8 @@ class _WalletPageState extends State<WalletPage> {
               icon: _iconFor(tx),
               formattedAmount: _formatRupiah(tx.signedAmount),
               formattedDate:
-                  DateFormat('dd MMM yyyy • HH:mm').format(tx.dateTime),
+                  DateFormat('dd MMM yyyy • HH:mm')
+                      .format(tx.dateTime),
               onDelete: () => _confirmDelete(tx),
             )
                 .animate(
@@ -633,13 +749,11 @@ class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  final bool isPositive;
 
   const _MiniStat({
     required this.label,
     required this.value,
     required this.icon,
-    required this.isPositive,
   });
 
   @override
@@ -780,8 +894,7 @@ class _TransactionTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
                           fontSize: 12,
-                          color:
-                              colorScheme.onSurfaceVariant,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -815,10 +928,8 @@ class _TransactionTile extends StatelessWidget {
                     child: Icon(
                       Icons.delete_outline_rounded,
                       size: 16,
-                      color:
-                          colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.7,
-                      ),
+                      color: colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.7),
                     ),
                   ),
                 ],

@@ -37,6 +37,11 @@ class WalletTransaction {
   /// When the record was created (used only for stable ordering).
   final DateTime createdAt;
 
+  /// Which wallet account this transaction belongs to.
+  /// Defaults to 'personal' for backward compatibility with
+  /// transactions saved before accounts existed.
+  final String accountId;
+
   WalletTransaction({
     required this.id,
     required this.type,
@@ -45,6 +50,7 @@ class WalletTransaction {
     this.description = '',
     required this.dateTime,
     DateTime? createdAt,
+    this.accountId = 'personal',
   }) : createdAt = createdAt ?? DateTime.now();
 
   /// Signed amount for balance math and Excel export.
@@ -70,6 +76,7 @@ class WalletTransaction {
       'description': description,
       'dateTime': dateTime.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      'accountId': accountId,
     };
   }
 
@@ -102,6 +109,7 @@ class WalletTransaction {
             json['createdAt']?.toString() ?? '',
           ) ??
           DateTime.now(),
+      accountId: json['accountId']?.toString() ?? 'personal',
     );
   }
 
@@ -113,6 +121,7 @@ class WalletTransaction {
     String? description,
     DateTime? dateTime,
     DateTime? createdAt,
+    String? accountId,
   }) {
     return WalletTransaction(
       id: id ?? this.id,
@@ -122,6 +131,7 @@ class WalletTransaction {
       description: description ?? this.description,
       dateTime: dateTime ?? this.dateTime,
       createdAt: createdAt ?? this.createdAt,
+      accountId: accountId ?? this.accountId,
     );
   }
 }

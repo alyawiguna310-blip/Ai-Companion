@@ -60,6 +60,28 @@ class WalletStorageService {
     }
   }
 
+    /// Returns transactions for a specific account.
+  static Future<List<WalletTransaction>> loadForAccount(
+    String accountId,
+  ) async {
+    final all = await loadTransactions();
+    return all.where((tx) => tx.accountId == accountId).toList();
+  }
+
+  /// Total balance for a specific account.
+  static int balanceForAccount(
+    List<WalletTransaction> all,
+    String accountId,
+  ) {
+    final filtered =
+        all.where((tx) => tx.accountId == accountId);
+    var total = 0;
+    for (final tx in filtered) {
+      total += tx.signedAmount;
+    }
+    return total;
+  }
+
   // ============================================================
   // SAVE (full replace)
   // ============================================================

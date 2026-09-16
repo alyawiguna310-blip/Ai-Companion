@@ -397,7 +397,7 @@ class _CharacterSelectionPageState
     return Scaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
-      appBar: (_currentTab == 1 || _currentTab == 3)
+        appBar: (_currentTab == 1 || _currentTab == 3 || _currentTab == 4)
           ? null
           : AppBar(
               automaticallyImplyLeading: false,

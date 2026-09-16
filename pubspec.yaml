@@ -21,6 +21,11 @@ dependencies:
   share_plus: ^10.0.0
 
   # =========================
+  # Google Drive
+  # =========================
+  file_picker: ^8.1.2
+
+  # =========================
   # Url Github Updater
   # =========================
   url_launcher: ^6.3.0
