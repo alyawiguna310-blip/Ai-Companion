@@ -1,46 +1,76 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
-  static final NotificationService instance = NotificationService._internal();
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  static final NotificationService instance =
+      NotificationService._internal();
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
 
   NotificationService._internal();
+
+  static const AndroidNotificationChannel _channel =
+      AndroidNotificationChannel(
+    'high_importance_channel',
+    'High Importance Notifications',
+    description:
+        'This channel is used for important reminders and alerts.',
+    importance: Importance.max,
+    playSound: true,
+    enableVibration: true,
+    showBadge: true,
+  );
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
 
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'high_importance_channel',
-      'High Importance Notifications',
-      description: 'This channel is used for important reminders and alerts.',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    // Create the channel first
+    await androidPlugin?.createNotificationChannel(_channel);
+
+    // Request POST_NOTIFICATIONS (Android 13+)
+    await androidPlugin?.requestNotificationsPermission();
+
+    // Request SCHEDULE_EXACT_ALARM (Android 12+)
+    // CRITICAL: without this, scheduled reminders DON'T fire when
+    // the app is backgrounded or closed.
+    await androidPlugin?.requestExactAlarmsPermission();
+
+    // Fallback via permission_handler
+    if (Platform.isAndroid) {
+      await Permission.notification.request();
+    }
+
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
     );
 
-    await _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(channel);
-
-    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+    const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
 
-    const InitializationSettings settings = InitializationSettings(
+    const settings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
 
     await _plugin.initialize(
       settings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (kDebugMode) print("Notification tapped! Payload: ${response.payload}");
+      onDidReceiveNotificationResponse: (response) {
+        if (kDebugMode) {
+          debugPrint(
+            'Notification tapped! Payload: ${response.payload}',
+          );
+        }
       },
     );
   }
@@ -51,17 +81,21 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    const androidDetails = AndroidNotificationDetails(
       'high_importance_channel',
       'High Importance Notifications',
-      importance: Importance.high,
+      channelDescription:
+          'This channel is used for important reminders and alerts.',
+      importance: Importance.max,
       priority: Priority.high,
+      showWhen: true,
+      enableVibration: true,
+      playSound: true,
     );
 
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
-    const NotificationDetails details = NotificationDetails(
+    const details = NotificationDetails(
       android: androidDetails,
-      iOS: iosDetails,
+      iOS: DarwinNotificationDetails(),
     );
 
     await _plugin.show(id, title, body, details, payload: payload);
@@ -74,30 +108,66 @@ class NotificationService {
     required DateTime scheduledDate,
     String? payload,
   }) async {
-    final tz.TZDateTime scheduledTzDate = tz.TZDateTime.from(scheduledDate, tz.local);
+    final now = DateTime.now();
+    final effective =
+        scheduledDate.isBefore(now) ? now : scheduledDate;
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    final tzDate = tz.TZDateTime.from(effective, tz.local);
+
+    const androidDetails = AndroidNotificationDetails(
       'high_importance_channel',
       'High Importance Notifications',
-      importance: Importance.high,
+      channelDescription:
+          'This channel is used for important reminders and alerts.',
+      importance: Importance.max,
       priority: Priority.high,
+      showWhen: true,
+      enableVibration: true,
+      playSound: true,
     );
 
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
-    const NotificationDetails details = NotificationDetails(
+    const details = NotificationDetails(
       android: androidDetails,
-      iOS: iosDetails,
+      iOS: DarwinNotificationDetails(),
     );
 
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduledTzDate,
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: payload,
-    );
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzDate,
+        details,
+        androidScheduleMode:
+            AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payload,
+      );
+
+      if (kDebugMode) {
+        debugPrint(
+          'Notification scheduled: id=$id, at=$tzDate',
+        );
+      }
+    } catch (error) {
+      // If exact alarm permission was denied, fall back to
+      // inexact (approximate) scheduling.
+      if (kDebugMode) {
+        debugPrint(
+          'Exact scheduling failed, falling back: $error',
+        );
+      }
+
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzDate,
+        details,
+        androidScheduleMode:
+            AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: payload,
+      );
+    }
   }
 
   Future<void> cancelNotification(int id) async {

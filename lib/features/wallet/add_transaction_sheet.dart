@@ -13,8 +13,7 @@ class AddTransactionSheet extends StatefulWidget {
       _AddTransactionSheetState();
 }
 
-class _AddTransactionSheetState
-    extends State<AddTransactionSheet> {
+class _AddTransactionSheetState extends State<AddTransactionSheet> {
   TransactionType _type = TransactionType.expense;
 
   final TextEditingController _amountController =
@@ -35,6 +34,7 @@ class _AddTransactionSheetState
   }
 
   void _changeType(TransactionType type) {
+    if (type == _type) return;
     setState(() {
       _type = type;
       final list = WalletCategories.forType(type);
@@ -78,20 +78,22 @@ class _AddTransactionSheetState
 
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
             'Masukkan jumlah yang valid (lebih dari 0).',
+            style: GoogleFonts.poppins(fontSize: 13),
           ),
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       );
       return;
     }
 
     final tx = WalletTransaction(
-      id: DateTime.now()
-          .microsecondsSinceEpoch
-          .toString(),
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
       type: _type,
       amount: amount,
       category: _category,
@@ -102,43 +104,87 @@ class _AddTransactionSheetState
     Navigator.pop(context, tx);
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final bottomInset =
-        MediaQuery.viewInsetsOf(context).bottom;
+    final isDark = theme.brightness == Brightness.dark;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     final isExpense = _type == TransactionType.expense;
+    final accentColor =
+        isExpense ? colorScheme.error : const Color(0xFF00B894);
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 4,
-        bottom: bottomInset + 24,
-      ),
+      padding: EdgeInsets.only(bottom: bottomInset),
       child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Add Transaction',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
+            // ------------------------------------------------
+            // HEADER
+            // ------------------------------------------------
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        accentColor.withValues(alpha: 0.22),
+                        accentColor.withValues(alpha: 0.10),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Icon(
+                    isExpense
+                        ? Icons.arrow_upward_rounded
+                        : Icons.arrow_downward_rounded,
+                    color: accentColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add Transaction',
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        isExpense
+                            ? 'Record a new expense'
+                            : 'Record a new income',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Record a new income or expense.',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 18),
+
+            const SizedBox(height: 20),
 
             // ------------------------------------------------
             // TYPE TOGGLE
@@ -154,22 +200,96 @@ class _AddTransactionSheetState
                   Expanded(
                     child: _TypeButton(
                       label: 'Expense',
-                      icon: Icons.arrow_upward,
+                      icon: Icons.arrow_upward_rounded,
                       selected: isExpense,
-                      selectedColor: colorScheme.error,
-                      onTap: () => _changeType(
-                        TransactionType.expense,
-                      ),
+                      accentColor: colorScheme.error,
+                      onTap: () =>
+                          _changeType(TransactionType.expense),
                     ),
                   ),
                   Expanded(
                     child: _TypeButton(
                       label: 'Income',
-                      icon: Icons.arrow_downward,
+                      icon: Icons.arrow_downward_rounded,
                       selected: !isExpense,
-                      selectedColor: Colors.green,
-                      onTap: () => _changeType(
-                        TransactionType.income,
+                      accentColor: const Color(0xFF00B894),
+                      onTap: () =>
+                          _changeType(TransactionType.income),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 22),
+
+            // ------------------------------------------------
+            // AMOUNT
+            // ------------------------------------------------
+            Text(
+              'Amount',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1C1C1E)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: accentColor.withValues(alpha: 0.3),
+                  width: 1.4,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Rp',
+                    style: GoogleFonts.poppins(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: accentColor,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _amountController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      style: GoogleFonts.poppins(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: '0',
+                        hintStyle: GoogleFonts.poppins(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.4),
+                        ),
                       ),
                     ),
                   ),
@@ -177,128 +297,182 @@ class _AddTransactionSheetState
               ),
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 22),
 
             // ------------------------------------------------
-            // AMOUNT
+            // CATEGORY — PREMIUM GRID
             // ------------------------------------------------
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
-              decoration: InputDecoration(
-                labelText: 'Amount (Rp)',
-                hintText: '25000',
-                prefixIcon: const Icon(Icons.payments_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+            Text(
+              'Category',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-
-            const SizedBox(height: 14),
-
-            // ------------------------------------------------
-            // CATEGORY
-            // ------------------------------------------------
-            DropdownButtonFormField<String>(
-              initialValue: _category,
-              decoration: InputDecoration(
-                labelText: 'Category',
-                prefixIcon:
-                    const Icon(Icons.category_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              items: WalletCategories.forType(_type)
-                  .map(
-                    (value) => DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  _category = value;
-                });
+            const SizedBox(height: 10),
+            _CategoryGrid(
+              categories:
+                  WalletCategories.forType(_type),
+              selected: _category,
+              accentColor: accentColor,
+              isExpense: isExpense,
+              onSelect: (cat) {
+                setState(() => _category = cat);
               },
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 22),
 
             // ------------------------------------------------
             // DESCRIPTION
             // ------------------------------------------------
-            TextField(
-              controller: _descriptionController,
-              maxLines: 2,
-              textCapitalization:
-                  TextCapitalization.sentences,
-              decoration: InputDecoration(
-                labelText: 'Description (optional)',
-                hintText: 'e.g. Lunch with friends',
-                prefixIcon:
-                    const Icon(Icons.notes_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+            Text(
+              'Note (optional)',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1C1C1E)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.outlineVariant
+                      .withValues(alpha: 0.5),
+                ),
+              ),
+              child: TextField(
+                controller: _descriptionController,
+                maxLines: 2,
+                textCapitalization:
+                    TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'e.g. Lunch with friends',
+                  hintStyle: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.6),
+                  ),
+                ),
+                style: GoogleFonts.poppins(fontSize: 14),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ------------------------------------------------
+            // DATE & TIME
+            // ------------------------------------------------
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _pickDateTime,
+                borderRadius: BorderRadius.circular(16),
+                child: Ink(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF1C1C1E)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant
+                          .withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary
+                              .withValues(alpha: 0.14),
+                          borderRadius:
+                              BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.event_rounded,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Date & Time',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color:
+                                    colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            Text(
+                              DateFormat(
+                                'EEEE, dd MMM yyyy • HH:mm',
+                              ).format(_dateTime),
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color:
+                            colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 24),
 
             // ------------------------------------------------
-            // DATE / TIME
-            // ------------------------------------------------
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.event_outlined),
-              title: Text(
-                'Date & Time',
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              subtitle: Text(
-                DateFormat('EEEE, dd MMM yyyy • HH:mm')
-                    .format(_dateTime),
-                style: GoogleFonts.poppins(fontSize: 12),
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 14),
-              onTap: _pickDateTime,
-            ),
-
-            const SizedBox(height: 20),
-
-            // ------------------------------------------------
-            // SAVE
+            // SAVE BUTTON
             // ------------------------------------------------
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 54,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor:
-                      isExpense ? colorScheme.error : Colors.green,
+                  backgroundColor: accentColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                 ),
                 onPressed: _save,
-                icon: const Icon(Icons.check),
+                icon: const Icon(Icons.check_rounded),
                 label: Text(
                   isExpense
                       ? 'Save Expense'
                       : 'Save Income',
                   style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700,
+                    fontSize: 15,
                   ),
                 ),
               ),
@@ -318,14 +492,14 @@ class _TypeButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool selected;
-  final Color selectedColor;
+  final Color accentColor;
   final VoidCallback onTap;
 
   const _TypeButton({
     required this.label,
     required this.icon,
     required this.selected,
-    required this.selectedColor,
+    required this.accentColor,
     required this.onTap,
   });
 
@@ -343,7 +517,7 @@ class _TypeButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? selectedColor
+                ? accentColor
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
@@ -372,6 +546,140 @@ class _TypeButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// CATEGORY GRID — the main fix
+// ============================================================
+
+class _CategoryGrid extends StatelessWidget {
+  final List<String> categories;
+  final String selected;
+  final Color accentColor;
+  final bool isExpense;
+  final ValueChanged<String> onSelect;
+
+  const _CategoryGrid({
+    required this.categories,
+    required this.selected,
+    required this.accentColor,
+    required this.isExpense,
+    required this.onSelect,
+  });
+
+  static const Map<String, IconData> _iconMap = {
+    // Income
+    'Allowance': Icons.card_giftcard_rounded,
+    'Salary': Icons.work_rounded,
+    'Gift': Icons.redeem_rounded,
+    'Bonus': Icons.star_rounded,
+    'Refund': Icons.replay_rounded,
+    'Other Income': Icons.add_circle_outline_rounded,
+    // Expense
+    'Food': Icons.restaurant_rounded,
+    'Transport': Icons.directions_bus_rounded,
+    'Shopping': Icons.shopping_bag_rounded,
+    'Bills': Icons.receipt_long_rounded,
+    'Entertainment': Icons.movie_rounded,
+    'Health': Icons.medical_services_rounded,
+    'Education': Icons.school_rounded,
+    'Other Expense': Icons.more_horiz_rounded,
+  };
+
+  IconData _iconFor(String name) =>
+      _iconMap[name] ?? Icons.category_rounded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1.05,
+      ),
+      itemCount: categories.length,
+      itemBuilder: (context, index) {
+        final cat = categories[index];
+        final isSelected = cat == selected;
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => onSelect(cat),
+            borderRadius: BorderRadius.circular(16),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? accentColor.withValues(alpha: 0.14)
+                    : (isDark
+                        ? const Color(0xFF1C1C1E)
+                        : Colors.white),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected
+                      ? accentColor.withValues(alpha: 0.6)
+                      : colorScheme.outlineVariant
+                          .withValues(alpha: 0.5),
+                  width: isSelected ? 1.6 : 1,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: accentColor
+                              .withValues(alpha: 0.15),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _iconFor(cat),
+                    size: 22,
+                    color: isSelected
+                        ? accentColor
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 6),
+                  Flexible(
+                    child: Text(
+                      cat,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? accentColor
+                            : colorScheme.onSurface,
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

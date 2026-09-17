@@ -35,21 +35,29 @@ class UpdateInfo {
 
 /// Checks the configured GitHub repo for a newer release.
 ///
-/// Configure [owner] and [repo] below. The repo MUST have public
-/// releases with a semver-style tag (e.g. `v1.0.1`).
+/// The repo MUST have public releases with a semver-style tag
+/// (e.g. `v1.0.1`).
 class UpdateService {
   UpdateService._();
 
-  // ⚠️ CHANGE THESE TO YOUR GITHUB REPO ⚠️
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
+
   static const String owner = 'alyawiguna310-blip';
   static const String repo = 'Ai-Companion';
 
+  // ============================================================
+  // PUBLIC API
+  // ============================================================
+
   /// Returns an [UpdateInfo] if a newer release exists,
-  /// or `null` if up to date / repo not configured / network error.
+  /// or `null` if:
+  ///   • the app is already on the latest version
+  ///   • the repo is not configured
+  ///   • the network call failed
   static Future<UpdateInfo?> check() async {
-    if (owner == 'YOUR_GITHUB_USERNAME' || repo == 'YOUR_REPO_NAME') {
-      return null;
-    }
+    if (owner.isEmpty || repo.isEmpty) return null;
 
     try {
       final pkg = await PackageInfo.fromPlatform();
@@ -75,19 +83,26 @@ class UpdateService {
       final tag = release['tag_name']?.toString() ?? '';
       if (tag.isEmpty) return null;
 
-      final latestVersion = tag.startsWith('v')
-          ? tag.substring(1)
-          : tag;
+      // Robust parser handles: v1.0.1, v.1.0.1, V 1.0.1, release-1.0.1...
+      final latestVersion = _sanitizeVersion(tag);
 
-      if (_compare(latestVersion, currentVersion) <= 0) {
+      // If parsing failed, bail out.
+      if (latestVersion.isEmpty) return null;
+
+      // Compare using the same sanitizer on both sides, so a
+      // locally-installed version like "1.0.1+2" is handled too.
+      final localClean = _sanitizeVersion(currentVersion);
+
+      if (_compare(latestVersion, localClean) <= 0) {
         return null;
       }
 
       return UpdateInfo(
         latestVersion: latestVersion,
-        title: release['name']?.toString().trim().isNotEmpty == true
-            ? release['name'].toString()
-            : 'Version $latestVersion',
+        title:
+            release['name']?.toString().trim().isNotEmpty == true
+                ? release['name'].toString()
+                : 'Version $latestVersion',
         notes: release['body']?.toString() ?? '',
         releaseUrl: release['html_url']?.toString() ?? '',
         apkUrl: _findApkAsset(release),
@@ -100,6 +115,10 @@ class UpdateService {
     }
   }
 
+  // ============================================================
+  // ASSET FINDER
+  // ============================================================
+
   /// Finds a `.apk` asset in the release's [assets] array.
   static String? _findApkAsset(Map<String, dynamic> release) {
     final assets = release['assets'];
@@ -107,7 +126,8 @@ class UpdateService {
 
     for (final item in assets) {
       if (item is! Map) continue;
-      final name = item['name']?.toString().toLowerCase() ?? '';
+      final name =
+          item['name']?.toString().toLowerCase() ?? '';
       if (name.endsWith('.apk')) {
         return item['browser_download_url']?.toString();
       }
@@ -115,16 +135,54 @@ class UpdateService {
     return null;
   }
 
+  // ============================================================
+  // VERSION SANITIZER
+  // ============================================================
+
+  /// Cleans up messy GitHub tags and app versions:
+  ///
+  ///   'v1.0.1'          → '1.0.1'
+  ///   'v.1.0.1'         → '1.0.1'
+  ///   'V 1.0.1'         → '1.0.1'
+  ///   'release-1.0.1'   → '1.0.1'
+  ///   '1.0.1+2'         → '1.0.1'   (build number stripped)
+  ///   '1.0.1-beta'      → '1.0.1'
+  static String _sanitizeVersion(String raw) {
+    var v = raw.trim();
+
+    // Strip leading letters (v, V, release-, etc.) plus any
+    // separators that follow them.
+    v = v.replaceFirst(
+      RegExp(r'^[a-zA-Z]+[\-\.\s]*'),
+      '',
+    );
+
+    // Strip any remaining leading dots/dashes/spaces.
+    v = v.replaceFirst(RegExp(r'^[\.\-\s]+'), '');
+
+    // Strip anything after '+' (build number) or '-' (pre-release tag).
+    final cutIndex = v.indexOf(RegExp(r'[+\-]'));
+    if (cutIndex != -1) {
+      v = v.substring(0, cutIndex);
+    }
+
+    return v.trim();
+  }
+
+  // ============================================================
+  // SEMVER COMPARE
+  // ============================================================
+
   /// Semver-ish comparison. Returns:
   ///   < 0  → a older than b
   ///   = 0  → equal
   ///   > 0  → a newer than b
   static int _compare(String a, String b) {
-    final aParts = a
+    final aParts = _sanitizeVersion(a)
         .split('.')
         .map((p) => int.tryParse(p) ?? 0)
         .toList();
-    final bParts = b
+    final bParts = _sanitizeVersion(b)
         .split('.')
         .map((p) => int.tryParse(p) ?? 0)
         .toList();

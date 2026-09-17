@@ -1,13 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permission -->
+    <!-- Internet -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <!-- Camera -->
     <uses-permission android:name="android.permission.CAMERA"/>
 
-    <!-- Storage permission compatibility -->
+    <!-- Notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- Exact alarms (Android 12+) — required for scheduled
+         reminders to fire when the app is closed -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+
+    <!-- Re-register scheduled notifications after reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+    <!-- Wake the device when an alarm fires -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <!-- Storage permissions for older Android (<= 32) -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="32"
@@ -16,7 +31,6 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32"/>
-
 
     <application
         android:label="Aicompanion"
@@ -39,26 +53,46 @@
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
-
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-
         </activity>
-
 
         <!-- Flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
 
-    </application>
+        <!-- flutter_local_notifications: fires scheduled alarms -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"/>
 
+        <!-- flutter_local_notifications: re-registers alarms after
+             a device reboot -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
+    </application>
 
     <!-- Required for text processing -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+
+        <!-- Required so flutter_tts can find the system TTS service
+             (Android 11+ package visibility) -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
         </intent>
     </queries>
 
